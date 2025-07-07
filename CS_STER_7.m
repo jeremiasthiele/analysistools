@@ -41,13 +41,15 @@ tpath = 'c:\ProgrammeOhneInstallation\';
 tfname = 'tempraatfile.wav';
 %fpath  = 'C:\Users\krist\OneDrive\Desktop\Analysis_Selections\';
 fpath  = 'c:\Users\Malte Kob\Filr\Für mich freigegeben\Audio_Analysis_Selections\';
+fpath  = 'c:\temp\Audio\files\';
 %fname  = '1.a.1.wav';
 
 cd(fpath);
 %partlist = dir;
 partlist = GetSubDirsFirstLevelOnly(pwd)
 for partidx = 1:size(partlist,2)
-  actpart = char(partlist(partidx))
+  lineidx = 1;
+  actpart = char(partlist(partidx));
   cd(actpart)
   figpath='C:\temp\';
 %  IMAGE_PATH = figpath;
@@ -130,9 +132,9 @@ for partidx = 1:size(partlist,2)
         endif
       endfor
       FORMANTS = str2num(TEXT);
-      printf ("Praat call successful! - ");
+      printf ("Praat call successful!\n");
     else
-      printf ("Praat call not successful! - ");
+      printf ("Praat call not successful!\n");
     endif
 
 
@@ -146,7 +148,7 @@ for partidx = 1:size(partlist,2)
     %axis([timemin timemax -inf inf])
     grid on
     title([actpart,' - ',fnamestr,'.wav']);
-    legend('before selection and filtering')
+    %legend('before selection and filtering')
     set(gca,"Fontsize",FontSize)
 
     subplot(2,1,2)
@@ -160,7 +162,7 @@ for partidx = 1:size(partlist,2)
     ylabel('SPL (dB)')
     %axis([timemin timemax SPLmax-80 SPLmax])
     grid on
-    legend('unfiltered', 'filtered')
+    %legend('unfiltered', 'filtered')
     set(gca,"Fontsize",FontSize)
 
     % Spectrogram
@@ -193,10 +195,10 @@ for partidx = 1:size(partlist,2)
 
     %savefig(timefigh,[figpath,'time_',fname])
     saveas(timefigh,[figpath,'time_',fname,'.png'])
-
+    delete(timefigh)
 
     freqfigh=figure(2); % Spektrum of selected signal
-    clf
+    %clf
     % Octave
     N = timemaxidx-timeminidx+1; % number of data points
     spec = fft(amplitude); % numerical approx. of FT
@@ -205,20 +207,53 @@ for partidx = 1:size(partlist,2)
     min_f = -FS/2; % min freq. for which fft is calculated
     max_f = FS/2 - df; % max freq. for which fft is calculated
     f = [min_f : df : max_f]'; % horizontal values
-    size(f); % should equal N
     y = 20*log10(abs(fftshift(spec))); % level of shifted spectrum
     yf = 20*log10(abs(fftshift(specf))); % level of shifted spectrum
     Lmin = max(y)-dispRange;
     Lmax = max(y)+5;
 
-    plot(f, y, 'r', f, yf, 'b')
-    %set(gcf,'Position',[100 200 1200 800])
+    % calculation and display of spectral slope
+    Nss = length(amplitude);
+    Xss = abs(fft(amplitude));
+    Xssf = abs(fft(amplitudef));
+    fss = (0:N-1)*(FS/N);
+
+    % Nur bis Nyquist-Frequenz anzeigen
+    half_Nss = floor(N/2);
+    fss = fss(find(fss<fmax));
+    Xss = Xss(1:length(fss));
+    Xssf = Xssf(1:length(fss));
+
+    % Plot des Spektrums
+%    subplot(2,1,1);
+%    plot(fss, 20*log10(Xss));
+%    title('Spektrum (Betragsfrequenzgang in dB)');
+%    xlabel('Frequenz (Hz)');
+%    ylabel('Amplitude (dB)');
+
+    % Spektrale Steigung (lineare Regression im dB-Spektrum)
+    pss = polyfit(fss, 20*log10(Xss), 1);  % lineare Regression
+    pssf = polyfit(fss, 20*log10(Xssf), 1);  % lineare Regression
+%    hold on;
+%    plot(fss, polyval(pss, fss), 'r--', 'LineWidth', 2);
+%    legend('Spektrum', sprintf('Spektrale Steigung: %.2f dB/kHz', 1000*pss(1)));
+
+%    mididx =floor(size(f,1)/2)+2;
+%    maxidx = length(f);
+%    p = polyfit(f(mididx:maxidx), y(mididx:maxidx), 1);  % Fit line: mag vs frequency
+%    spectralslope = p(1);  % Slope in dB/Hz
+%    pf = polyfit(f(mididx:maxidx), yf(mididx:maxidx), 1);  % Fit line: mag vs frequency
+%    spectralslopef = pf(1);  % Slope in dB/Hz
+%    printf("Spectral slope: %.4f dB/Hz\n", spectralslope);
+%    printf("Spectral slope filtered: %.4f dB/Hz\n", spectralslopef);
+
+
+    line([FORMANTS(1),FORMANTS(1)],[Lmin+5 Lmax-3], 'marker', 'd');
+    hold on
     xlabel('Frequency (Hz)')
     ylabel('FFT (dB)')
     axis([0 fmax Lmin Lmax])
 
-    hold on
-    line([FORMANTS(1),FORMANTS(1)],[Lmin+5 Lmax-3], 'marker', 'd');
     text(FORMANTS(1),Lmin+3,'F1', 'fontsize', FontSize)
     fu=FORMANTS(1)-FORMANTS(6)/2;fo=FORMANTS(1)+FORMANTS(6)/2;
     fuidx=min(find(f>fu));foidx=max(find(f<fo));
@@ -249,24 +284,32 @@ for partidx = 1:size(partlist,2)
     yfu=yf(fuidx);yfo=yf(foidx);
     area (f(fuidx:foidx), y(fuidx:foidx),'facecolor',[0.85 0.85 1],'edgecolor',[0.85 0.85 1],'linewidth',2);
 
+    plot(f, y, 'r', f, yf, 'b')
+    plot(fss, polyval(pss, fss), 'm--', 'LineWidth', 2);
+    plot(fss, polyval(pssf, fss), 'c--', 'LineWidth', 2);
+
     hold off
 
     grid on
-    legend('unfiltered', 'filtered', 'Formant frequency', 'formant bandwidth')
+    %legend('F1', 'B_{F1}', 'F2', 'B_{F2}', 'F3', 'B_{F3}', 'F4', 'B_{F4}', 'F5', 'B_{F5}', 'unfiltered', 'filtered', sprintf('Spectral slope unfiltered: %.2f dB/kHz', 1000*pss(1)), sprintf('Spectral slope filtered: %.2f dB/kHz', 1000*pssf(1)))
     %legend('Formants from Praat','formant bandwidth', 'unfiltered', 'filtered')
     set(gca,"Fontsize",FontSize)
     title([actpart,' - ',fnamestr,'.wav']);
 
     %savefig(freqfigh,[figpath,'freq_',fname])
     saveas(freqfigh,[figpath,'freq_',fname,'.png'])
+    delete(freqfigh)
+
     FormantTable = [[1:5]',FORMANTS(1:5),FORMANTS(6:10)]; % first formant frequencies, then formant bandwidths
     rstatus = xlswrite ([figpath,'Formants_',fname], FormantTable);
+    SpectralSlopeTable = [1000*pss(1),1000*pssf(1)]; % first: spectral slope unfiltered (dB/kHz), second: spectral slope filtered (dB/kHz)
+    rstatus = xlswrite ([figpath,'SpectralSlope_',fname], SpectralSlopeTable);
 
 
 
     ERh=figure(3); % Calculation of STER
 
-    clf
+%    clf
 
     % For each phrase, the mean acoustic power in dB (unweighted) was computed.
     % We then computed the average power spectral density by means of the FFT
@@ -330,7 +373,7 @@ for partidx = 1:size(partlist,2)
     title('Filtered Spectrum')
     xlabel('Frequency (Hz)')
     ylabel('SPL (dB)')
-    legend(['Range 1: ',num2str(fRange1L),'-',num2str(fRange1U),' Hz'; 'Range 2: ',num2str(fRange2L),'-',num2str(fRange2U),' Hz'; 'Range 3: ',num2str(fRange3L),'-',num2str(fRange3U),' Hz'])
+    %legend(['Range 1: ',num2str(fRange1L),'-',num2str(fRange1U),' Hz'; 'Range 2: ',num2str(fRange2L),'-',num2str(fRange2U),' Hz'; 'Range 3: ',num2str(fRange3L),'-',num2str(fRange3U),' Hz'])
     set(gca,"Fontsize",FontSize)
 
 
@@ -360,13 +403,13 @@ for partidx = 1:size(partlist,2)
     delete(h1)
     set(h2,'color','k')
     ylabel (ax(2), "'Short-Term Energy ratio (dB)'")
-    legend('STE Range 1', 'STE Range 2', 'STE Range 3', 'STER 1-2 (R1-R2) (dB)', 'STER 3-2 (R3-R2) (dB)', 'STER 3-1 (R3-R1) (dB)')
+    %legend('STE Range 1', 'STE Range 2', 'STE Range 3', 'STER 1-2 (R1-R2) (dB)', 'STER 3-2 (R3-R2) (dB)', 'STER 3-1 (R3-R1) (dB)')
     set(gca,"Fontsize",FontSize)
     hold off
 
     %savefig(ERh,[figpath,'ER_',fname])
     saveas(ERh,[figpath,'ER_',fname,'.png'])
-
+    delete(ERh)
 
     boxh=figure(4);
 
@@ -390,8 +433,6 @@ for partidx = 1:size(partlist,2)
     ERTable=[meanSTER1,medianSTER1,stdSTER1;meanSTER2,medianSTER2,stdSTER2;...
     meanSTER3,medianSTER3,stdSTER3];
 
-    ExcelContent = [[1:13];FormantTable,[ERTable;0,0,0;0,0,0],[boxstatistics,zeros(7,2)]'];
-
     title([actpart,' - ',fnamestr,'.wav']);
     ylabel('STER')
     set(gca,'ylim',[-40 40])
@@ -400,19 +441,90 @@ for partidx = 1:size(partlist,2)
     set(gca,"Fontsize",FontSize)
     %savefig(boxh,[figpath,'ERBox_',fname])
     saveas(boxh,[figpath,'ERBox_',fname,'.png'])
+    delete(boxh)
     rstatus = xlswrite ([figpath,'ERBoxStats_',fname], boxstatistics);
+
+%    ExcelContent = [[1:13];FormantTable,[ERTable;0,0,0;0,0,0],[boxstatistics,zeros(7,2)]'];
+    ExcelContent = [FormantTable(1,2:3),FormantTable(2,2:3), ...
+    FormantTable(3,2:3),FormantTable(4,2:3),FormantTable(5,2:3), ...
+    ERTable(1,1:3), ERTable(2,1:3), ERTable(3,1:3), ...
+    boxstatistics(1:7,1)', boxstatistics(1:7,2)', boxstatistics(1:7,3)', ...
+    pss(1)*1000, pssf(1)*1000];
+
     rstatus = xlswrite ([figpath,'AllStats_',fname], ExcelContent);
-
-    ExcelRowStart = (recidx-1)*6 + 1;
+    if lineidx == 1
+%      ans = input("before save first line of AllStats...")
+      rstatus = xlswrite ([figpath,'AllStats'], [1:42], actpart, 'B1:AQ1');
+%      ans = input("after save first line of AllStats...")
+    endif
+    ExcelRowStart = lineidx+1;
     ExcelRowStartStr = num2str(ExcelRowStart);
-    ExcelRowEnd   = ExcelRowStart + 5;
-    ExcelRowEndStr= num2str(ExcelRowEnd);
     ExcelStrRec = ['A',ExcelRowStartStr,':A',ExcelRowStartStr];
-    ExcelStrTab = ['B',ExcelRowStartStr,':N',ExcelRowEndStr]
+%    figpath
+%    ans = input("before save data label of AllStats...")
     rstatus = xlswrite ([figpath,'AllStats'], fnamecellarray, actpart, ExcelStrRec);
+%    ans = input("after save data label of AllStats...")
+    ExcelStrTab = ['B',ExcelRowStartStr,':AQ',ExcelRowStartStr];
+%    ans = input("before save data content of AllStats...")
     rstatus = xlswrite ([figpath,'AllStats'], ExcelContent, actpart, ExcelStrTab);
+    printf ("Data saved! \n\n");
+%    ans = input("after save data content of AllStats...")
 
-    % AllStats Excel Table
+    % new AllStats Excel Table:
+    % 1: 1. Formant Frequency (Hz)
+    % 2: 1. Formant Bandwidth (Hz)
+    % 3: 2. Formant Frequency (Hz)
+    % 4: 2. Formant Bandwidth (Hz)
+    % 5: 3. Formant Frequency (Hz)
+    % 6: 3. Formant Bandwidth (Hz)
+    % 7: 4. Formant Frequency (Hz)
+    % 8: 4. Formant Bandwidth (Hz)
+    % 9: 5. Formant Frequency (Hz)
+    %10: 5. Formant Bandwidth (Hz)
+    %11: 1. Range ST Energy mean (dB)
+    %12: 1. Range ST Energy median (dB)
+    %13: 1. Range ST Energy standard deviation (dB)
+    %14: 2. Range ST Energy mean (dB)
+    %15: 2. Range ST Energy median (dB)
+    %16: 2. Range ST Energy standard deviation (dB)
+    %17: 3. Range ST Energy mean (dB)
+    %18: 3. Range ST Energy median (dB)
+    %19: 3. Range ST Energy standard deviation (dB)
+    %20: STER 1-2 minimum (dB)
+    %21: STER 1-2 1st quartile (dB)
+    %22: STER 1-2 2nd quartile (median) (dB)
+    %23: STER 1-2 3rd quartile (dB)
+    %24: STER 1-2 Maximum (dB)
+    %25: STER 1-2 Lower confidence limit for median (dB)
+    %26: STER 1-2 Upper confidence limit for median (dB)
+    %27: STER 3-2 minimum (dB)
+    %28: STER 3-2 1st quartile (dB)
+    %29: STER 3-2 2nd quartile (median) (dB)
+    %30: STER 3-2 3rd quartile (dB)
+    %31: STER 3-2 Maximum (dB)
+    %32: STER 3-2 Lower confidence limit for median (dB)
+    %33: STER 3-2 Upper confidence limit for median (dB)
+    %34: STER 3-1 minimum (dB)
+    %35: STER 3-1 1st quartile (dB)
+    %36: STER 3-1 2nd quartile (median) (dB)
+    %37: STER 3-1 3rd quartile (dB)
+    %38: STER 3-1 Maximum (dB)
+    %39: STER 3-1 Lower confidence limit for median (dB)
+    %40: STER 3-1 Upper confidence limit for median (dB)
+    %41: Spectral slope (dB/kHz)
+    %42: Spectral slope (dB/kHz)
+
+
+%    ExcelRowStart = (recidx-1)*6 + 1;
+%    ExcelRowStartStr = num2str(ExcelRowStart);
+%    ExcelRowEnd   = ExcelRowStart + 5;
+%    ExcelRowEndStr= num2str(ExcelRowEnd);
+%    ExcelStrRec = ['A',ExcelRowStartStr,':A',ExcelRowStartStr];
+%    ExcelStrTab = ['B',ExcelRowStartStr,':N',ExcelRowEndStr]
+%    rstatus = xlswrite ([figpath,'AllStats'], fnamecellarray, actpart, ExcelStrRec);
+%    rstatus = xlswrite ([figpath,'AllStats'], ExcelContent, actpart, ExcelStrTab);
+
+    % old AllStats Excel Table:
     % 1st row: Index of Parameter
     % 1st col: Index of Formant (1..5), STE range (1..3), STER (1-2, 3-2, 3-1)
     % 2nd col: Formant Frequency (Hz)
@@ -427,6 +539,7 @@ for partidx = 1:size(partlist,2)
     % 11th col: STER Maximum (dB)
     % 12th col: STER Lower confidence limit for median (dB)
     % 13th col: STER Upper confidence limit for median (dB)
+    lineidx = lineidx +1;
   endfor
   cd ..
 endfor
